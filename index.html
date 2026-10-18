@@ -31,6 +31,11 @@ li button{background:none;border:0;color:var(--mute);font-size:1.2rem;cursor:poi
 #out{margin-top:14px}
 #out a{display:inline-block;background:var(--ink);color:var(--bg);padding:12px 18px;border-radius:10px;text-decoration:none;font-weight:600}
 .warn{margin-top:12px;font-size:.85rem;color:var(--ink);background:var(--card);border:1px solid var(--line);border-left:4px solid var(--acc);border-radius:8px;padding:10px 12px}
+.gl{margin-top:18px;border:1px solid var(--line);border-radius:10px;background:var(--card)}
+.gl summary{cursor:pointer;padding:12px 14px;font-weight:600}
+.gl .in{padding:0 14px 14px;font-size:.88rem}
+.gl h3{font-size:.92rem;margin:16px 0 6px}
+.gl dl{margin:0}.gl dt{font-weight:600;margin-top:8px}.gl dd{margin:2px 0 0;color:var(--mute)}
 .note{margin-top:26px;font-size:.85rem;color:var(--mute);border-top:1px solid var(--line);padding-top:14px}
 </style>
 </head>
@@ -49,6 +54,38 @@ li button{background:none;border:0;color:var(--mute);font-size:1.2rem;cursor:poi
 
 <p class="note">Vengono uniti note, evidenziazioni, segnalibri, etichette e campi di testo. Il backup con la data più recente fa da base e ne vengono mantenuti nome del dispositivo e miniatura. Vengono unite anche le playlist, con i loro file multimediali. Note, evidenziazioni e segnalibri di pubblicazioni che non hai nella libreria vengono mantenuti nel file: restano nel database del backup. Conserva sempre i file originali.</p>
 <p class="warn"><strong>Importante:</strong> i backup da unire devono essere stati creati con la stessa versione aggiornata di JW Library. Aggiorna l'app su tutti i dispositivi e rifai i backup prima di unirli: se le versioni sono diverse, la pagina si ferma con un avviso.</p>
+<details class="gl">
+<summary>Cosa significano i messaggi</summary>
+<div class="in">
+<p>La maggior parte dei messaggi non sono errori: sono il riepilogo di cosa ha fatto l'unione. Gli errori veri compaiono in rosso e iniziano con «Errore:».</p>
+<h3>Riepilogo dopo «Fatto»</h3>
+<dl>
+<dt>Aggiunti dagli altri backup</dt><dd>Quello che è entrato di nuovo nel file unito.</dd>
+<dt>Già presenti e non duplicati</dt><dd>Elementi che stavano in più backup e sono stati contati una volta sola.</dd>
+<dt>Note presenti in più backup con testo diverso</dt><dd>La stessa nota era stata modificata in modi diversi: ho tenuto la versione modificata più di recente.</dd>
+<dt>Evidenziazioni o campi di testo con colori o valori diversi</dt><dd>Ho tenuto quello del backup con la priorità più alta, cioè quello indicato come «base».</dd>
+<dt>Evidenziazioni senza testo ripristinate da un altro backup</dt><dd>In un backup mancava il testo evidenziato e l'ho recuperato da un altro.</dd>
+<dt>Paragrafi evidenziati aggiunti</dt><dd>Un'evidenziazione su più paragrafi era completa solo in uno dei backup.</dd>
+<dt>Non inseriti perché la pubblicazione ha già 10 segnalibri</dt><dd>Il limite è di 10 segnalibri per pubblicazione. Quelli elencati sono rimasti fuori e vanno ricreati a mano.</dd>
+</dl>
+<h3>Backup danneggiati</h3>
+<p>Questi messaggi compaiono quando uno dei backup ha dati rovinati, per esempio da un'unione precedente fatta male. Sotto il nome del file compare «⚠ dati incoerenti» e quel backup ha la priorità minima.</p>
+<dl>
+<dt>Evidenziazioni senza testo (non visibili) ignorate</dt><dd>Evidenziazioni che avevano un colore ma nessun testo evidenziato.</dd>
+<dt>Evidenziazioni che puntavano a posizioni inesistenti</dt><dd>Non si possono recuperare da quel backup. Se hai un backup più vecchio dello stesso dispositivo, potrebbero essere ancora lì.</dd>
+<dt>Note con un collegamento errato a un'evidenziazione</dt><dd>Le note restano, con testo e posizione, ma senza il collegamento all'evidenziazione.</dd>
+<dt>Elementi con riferimenti non validi ignorati</dt><dd>Altri dati che puntavano a qualcosa che nel backup non esiste.</dd>
+</dl>
+<h3>Errori (in rosso)</h3>
+<dl>
+<dt>Impossibile scaricare le librerie</dt><dd>Manca la connessione a internet, oppure è bloccato il sito che ospita le librerie (cdnjs).</dd>
+<dt>… non è un backup JW Library valido</dt><dd>Il file non è un .jwlibrary leggibile.</dd>
+<dt>I backup hanno versioni diverse del database</dt><dd>Aggiorna JW Library su tutti i dispositivi, rifai i backup e riprova.</dd>
+<dt>File multimediale mancante</dt><dd>Una playlist cita un file che non è dentro i backup.</dd>
+<dt>Dato non valido in…, Controllo di coerenza o di integrità fallito</dt><dd>Non dovrebbero comparire. Se succede, la pagina non ti dà il file, per non rovinare i tuoi dati.</dd>
+</dl>
+</div>
+</details>
 </main>
 
 <script>
@@ -386,8 +423,8 @@ $('go').onclick=async()=>{
     let t=`Fatto. Aggiunti dagli altri backup: ${st.note} note, ${st.mark} evidenziazioni, ${st.bm} segnalibri, ${st.tag} etichette, ${st.tm} assegnazioni di etichette, ${st.if_n} campi di testo, ${st.pl} elementi di playlist.`;
     t+=`\nGià presenti e non duplicati: ${st.mark_same+st.mark_dup} evidenziazioni, ${st.bm_dup} segnalibri, ${st.tm_dup} assegnazioni di etichette, ${st.pl_dup} elementi di playlist.`;
     if(st.note_upd)t+=`\n${st.note_upd} note erano presenti in più backup con testo diverso: ho tenuto la versione modificata più di recente.`;
-    if(st.mark_color)t+=`\n${st.mark_color} evidenziazioni avevano colori diversi tra i backup: ho tenuto quello del backup più recente.`;
-    if(st.if_conf)t+=`\n${st.if_conf} campi di testo avevano valori diversi: ho tenuto quello del backup più recente.`;
+    if(st.mark_color)t+=`\n${st.mark_color} evidenziazioni avevano colori diversi tra i backup: ho tenuto quello del backup base.`;
+    if(st.if_conf)t+=`\n${st.if_conf} campi di testo avevano valori diversi: ho tenuto quello del backup base.`;
     if(st.mark_fixed)t+=`\n${st.mark_fixed} evidenziazioni senza testo in un backup sono state ripristinate da un altro.`;
     if(st.mark_empty)t+=`\n${st.mark_empty} evidenziazioni senza testo (non visibili) in un backup danneggiato sono state ignorate.`;
     if(st.range_added)t+=`\n${st.range_added} paragrafi evidenziati presenti solo in un backup sono stati aggiunti alle evidenziazioni già esistenti.`;
