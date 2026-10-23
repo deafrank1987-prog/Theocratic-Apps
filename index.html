@@ -29,6 +29,10 @@ li button{background:none;border:0;color:var(--mute);font-size:1.2rem;cursor:poi
 #log{margin-top:18px;font-size:.9rem;color:var(--mute);white-space:pre-line}
 #log.err{color:var(--err)}
 #out{margin-top:14px}
+#out{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.go2{border:1px solid var(--line);background:var(--card);color:var(--ink);font:600 1rem inherit;padding:11px 16px;border-radius:10px;cursor:pointer}
+.shmsg{flex-basis:100%;font-size:.85rem;color:var(--mute)}
+
 #out a{display:inline-block;background:var(--ink);color:var(--bg);padding:12px 18px;border-radius:10px;text-decoration:none;font-weight:600}
 .warn{margin-top:12px;font-size:.85rem;color:var(--ink);background:var(--card);border:1px solid var(--line);border-left:4px solid var(--acc);border-radius:8px;padding:10px 12px}
 .gl{margin-top:18px;border:1px solid var(--line);border-radius:10px;background:var(--card)}
@@ -83,6 +87,11 @@ li button{background:none;border:0;color:var(--mute);font-size:1.2rem;cursor:poi
 <dt>I backup hanno versioni diverse del database</dt><dd>Aggiorna JW Library su tutti i dispositivi, rifai i backup e riprova.</dd>
 <dt>File multimediale mancante</dt><dd>Una playlist cita un file che non è dentro i backup.</dd>
 <dt>Dato non valido in…, Controllo di coerenza o di integrità fallito</dt><dd>Non dovrebbero comparire. Se succede, la pagina non ti dà il file, per non rovinare i tuoi dati.</dd>
+</dl>
+<h3>Download</h3>
+<dl>
+<dt>Condividi / Apri in…</dt><dd>Su telefono e tablet apre il menu di condivisione con il file già pronto: scegli JW Library, se compare. Se non funziona, usa «Scarica il backup unito».</dd>
+<dt>Il browser ha aggiunto «.zip» al nome del file</dt><dd>Rinomina il file togliendo «.zip»: il nome deve finire con «.jwlibrary», altrimenti JW Library non lo legge.</dd>
 </dl>
 </div>
 </details>
@@ -416,10 +425,27 @@ $('go').onclick=async()=>{
     }
     const miss=need.filter(n=>!out.file(n));
     if(miss.length)throw new Error('File multimediali mancanti nel backup unito: '+miss.join(', '));
-    const blob=await out.generateAsync({type:'blob',compression:'DEFLATE'});
+    const zipped=await out.generateAsync({type:'blob',compression:'DEFLATE',mimeType:'application/octet-stream'});
+    const blob=new Blob([zipped],{type:'application/octet-stream'}); // tipo neutro: Safari non aggiunge «.zip» al nome
     const a=document.createElement('a');
     a.href=URL.createObjectURL(blob);a.download=mf.name;a.textContent='Scarica il backup unito';
     $('out').append(a);
+    if(navigator.share&&navigator.canShare){ // telefoni e tablet: apre direttamente il menu Condividi
+      const b=document.createElement('button'),s=document.createElement('div');
+      b.className='go2';b.textContent='Condividi / Apri in…';s.className='shmsg';
+      b.onclick=async()=>{
+        s.textContent='';
+        for(const type of ['application/octet-stream','application/zip']){
+          const file=new File([blob],mf.name,{type});
+          if(!navigator.canShare({files:[file]}))continue;
+          try{await navigator.share({files:[file]});s.textContent='Condiviso (tipo file: '+type+').'}
+          catch(e){if(e.name!=='AbortError')s.textContent='Condivisione non riuscita ('+e.name+'). Usa «Scarica il backup unito».'}
+          return;
+        }
+        s.textContent='Questo browser non permette di condividere il file. Usa «Scarica il backup unito».';
+      };
+      $('out').append(b,s);
+    }
     let t=`Fatto. Aggiunti dagli altri backup: ${st.note} note, ${st.mark} evidenziazioni, ${st.bm} segnalibri, ${st.tag} etichette, ${st.tm} assegnazioni di etichette, ${st.if_n} campi di testo, ${st.pl} elementi di playlist.`;
     t+=`\nGià presenti e non duplicati: ${st.mark_same+st.mark_dup} evidenziazioni, ${st.bm_dup} segnalibri, ${st.tm_dup} assegnazioni di etichette, ${st.pl_dup} elementi di playlist.`;
     if(st.note_upd)t+=`\n${st.note_upd} note erano presenti in più backup con testo diverso: ho tenuto la versione modificata più di recente.`;
