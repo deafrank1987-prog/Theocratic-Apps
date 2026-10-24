@@ -1,0 +1,448 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Unisci backup JW Library</title>
+<style>
+:root{--bg:#eef1f6;--card:#fff;--ink:#1b2430;--mute:#5b6676;--line:#d3d9e3;--acc:#2f5bea;--accink:#fff;--err:#b3261e}
+@media(prefers-color-scheme:dark){:root{--bg:#12161d;--card:#1b212b;--ink:#e8ecf3;--mute:#98a3b5;--line:#2c3544;--acc:#7b9bff;--accink:#0d1220;--err:#ff8a80}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.55 system-ui,-apple-system,"Segoe UI",sans-serif;padding:24px 16px}
+main{max-width:640px;margin:0 auto}
+h1{font-size:1.7rem;margin:0 0 6px;letter-spacing:-.01em}
+p.lead{color:var(--mute);margin:0 0 22px}
+#drop{display:block;background:var(--card);border:2px dashed var(--line);border-radius:14px;padding:34px 18px;text-align:center;cursor:pointer}
+#drop.over,#drop:focus-within{border-color:var(--acc)}
+#drop strong{display:block;font-size:1.05rem}
+#drop span{color:var(--mute);font-size:.92rem}
+input[type=file]{position:absolute;opacity:0;width:1px;height:1px}
+ul{list-style:none;margin:18px 0;padding:0;display:grid;gap:8px}
+li{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:10px 14px;display:flex;gap:12px;align-items:center;justify-content:space-between}
+li b{display:block;word-break:break-all}
+li small{color:var(--mute)}
+li button{background:none;border:0;color:var(--mute);font-size:1.2rem;cursor:pointer;padding:4px 8px}
+.base{font-size:.8rem;color:var(--acc);white-space:nowrap}
+.go{width:100%;border:0;border-radius:10px;background:var(--acc);color:var(--accink);font:600 1rem inherit;padding:14px;cursor:pointer}
+.go:disabled{opacity:.4;cursor:not-allowed}
+:focus-visible{outline:3px solid var(--acc);outline-offset:2px}
+#log{margin-top:18px;font-size:.9rem;color:var(--mute);white-space:pre-line}
+#log.err{color:var(--err)}
+#out{margin-top:14px}
+
+#out a{display:inline-block;background:var(--ink);color:var(--bg);padding:12px 18px;border-radius:10px;text-decoration:none;font-weight:600}
+.warn{margin-top:12px;font-size:.85rem;color:var(--ink);background:var(--card);border:1px solid var(--line);border-left:4px solid var(--acc);border-radius:8px;padding:10px 12px}
+.gl{margin-top:18px;border:1px solid var(--line);border-radius:10px;background:var(--card)}
+.gl summary{cursor:pointer;padding:12px 14px;font-weight:600}
+.gl .in{padding:0 14px 14px;font-size:.88rem}
+.gl h3{font-size:.92rem;margin:16px 0 6px}
+.gl dl{margin:0}.gl dt{font-weight:600;margin-top:8px}.gl dd{margin:2px 0 0;color:var(--mute)}
+.note{margin-top:26px;font-size:.85rem;color:var(--mute);border-top:1px solid var(--line);padding-top:14px}
+</style>
+</head>
+<body>
+<main>
+<h1>Unisci backup JW Library</h1>
+<p class="lead">Carica due o più file .jwlibrary (per esempio da iPhone e iPad) e ottieni un unico backup da ripristinare. Tutto avviene nel tuo browser: i file non vengono inviati a nessun server.</p>
+
+<label id="drop"><input id="inp" type="file" accept=".jwlibrary" multiple>
+<strong>Scegli i file di backup o trascinali qui</strong><span>Almeno due file .jwlibrary</span></label>
+
+<ul id="list"></ul>
+<button class="go" id="go" disabled>Unisci backup</button>
+<div id="log" role="status"></div>
+<div id="out"></div>
+
+<p class="note">Vengono uniti note, evidenziazioni, segnalibri, etichette e campi di testo. Il backup con la data più recente fa da base e ne vengono mantenuti nome del dispositivo e miniatura. Vengono unite anche le playlist, con i loro file multimediali. Note, evidenziazioni e segnalibri di pubblicazioni che non hai nella libreria vengono mantenuti nel file: restano nel database del backup. Conserva sempre i file originali.</p>
+<p class="warn"><strong>Importante:</strong> i backup da unire devono essere stati creati con la stessa versione aggiornata di JW Library. Aggiorna l'app su tutti i dispositivi e rifai i backup prima di unirli: se le versioni sono diverse, la pagina si ferma con un avviso.</p>
+<details class="gl">
+<summary>Cosa significano i messaggi</summary>
+<div class="in">
+<p>La maggior parte dei messaggi non sono errori: sono il riepilogo di cosa ha fatto l'unione. Gli errori veri compaiono in rosso e iniziano con «Errore:».</p>
+<h3>Riepilogo dopo «Fatto»</h3>
+<dl>
+<dt>Aggiunti dagli altri backup</dt><dd>Quello che è entrato di nuovo nel file unito.</dd>
+<dt>Già presenti e non duplicati</dt><dd>Elementi che stavano in più backup e sono stati contati una volta sola.</dd>
+<dt>Note presenti in più backup con testo diverso</dt><dd>La stessa nota era stata modificata in modi diversi: ho tenuto la versione modificata più di recente.</dd>
+<dt>Evidenziazioni o campi di testo con colori o valori diversi</dt><dd>Ho tenuto quello del backup con la priorità più alta, cioè quello indicato come «base».</dd>
+<dt>Evidenziazioni senza testo ripristinate da un altro backup</dt><dd>In un backup mancava il testo evidenziato e l'ho recuperato da un altro.</dd>
+<dt>Paragrafi evidenziati aggiunti</dt><dd>Un'evidenziazione su più paragrafi era completa solo in uno dei backup.</dd>
+<dt>Non inseriti perché la pubblicazione ha già 10 segnalibri</dt><dd>Il limite è di 10 segnalibri per pubblicazione. Quelli elencati sono rimasti fuori e vanno ricreati a mano.</dd>
+</dl>
+<h3>Backup danneggiati</h3>
+<p>Questi messaggi compaiono quando uno dei backup ha dati rovinati, per esempio da un'unione precedente fatta male. Sotto il nome del file compare «⚠ dati incoerenti» e quel backup ha la priorità minima.</p>
+<dl>
+<dt>Evidenziazioni senza testo (non visibili) ignorate</dt><dd>Evidenziazioni che avevano un colore ma nessun testo evidenziato.</dd>
+<dt>Evidenziazioni che puntavano a posizioni inesistenti</dt><dd>Non si possono recuperare da quel backup. Se hai un backup più vecchio dello stesso dispositivo, potrebbero essere ancora lì.</dd>
+<dt>Note con un collegamento errato a un'evidenziazione</dt><dd>Le note restano, con testo e posizione, ma senza il collegamento all'evidenziazione.</dd>
+<dt>Elementi con riferimenti non validi ignorati</dt><dd>Altri dati che puntavano a qualcosa che nel backup non esiste.</dd>
+</dl>
+<h3>Errori (in rosso)</h3>
+<dl>
+<dt>Impossibile scaricare le librerie</dt><dd>Manca la connessione a internet, oppure è bloccato il sito che ospita le librerie (cdnjs).</dd>
+<dt>… non è un backup JW Library valido</dt><dd>Il file non è un .jwlibrary leggibile.</dd>
+<dt>I backup hanno versioni diverse del database</dt><dd>Aggiorna JW Library su tutti i dispositivi, rifai i backup e riprova.</dd>
+<dt>File multimediale mancante</dt><dd>Una playlist cita un file che non è dentro i backup.</dd>
+<dt>Dato non valido in…, Controllo di coerenza o di integrità fallito</dt><dd>Non dovrebbero comparire. Se succede, la pagina non ti dà il file, per non rovinare i tuoi dati.</dd>
+</dl>
+<h3>Download</h3>
+<dl>
+<dt>Come ripristinare il file</dt><dd>In JW Library apri la sezione Studio personale, poi «Backup e ripristino» (l'icona a forma di nuvola) e «Ripristina un backup», quindi scegli il file .jwlibrary dall'app File. I nomi esatti dei pulsanti possono variare.</dd>
+<dt>Il browser ha aggiunto «.zip» al nome del file</dt><dd>Rinomina il file togliendo «.zip»: il nome deve finire con «.jwlibrary», altrimenti JW Library non lo legge.</dd>
+</dl>
+</div>
+</details>
+</main>
+
+<script>
+const SQLJS="https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.10.3/";
+const JSZIPJS="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js";
+let files=[], SQL;
+const $=id=>document.getElementById(id), log=(t,e)=>{$('log').textContent=t;$('log').className=e?'err':''};
+const loadScript=src=>new Promise((ok,ko)=>{const s=document.createElement('script');s.src=src;s.onload=ok;s.onerror=()=>ko(new Error('Impossibile scaricare le librerie da internet. Controlla la connessione e riprova.'));document.head.append(s)});
+// Le librerie vengono scaricate solo quando servono (alla scelta del primo file)
+async function loadLibs(){
+  if(!window.JSZip)await loadScript(JSZIPJS);
+  if(!window.initSqlJs)await loadScript(SQLJS+'sql-wasm.js');
+  SQL=SQL||await initSqlJs({locateFile:f=>SQLJS+f});
+}
+
+// ---------- gestione file ----------
+const flag=f=>(f.chk.bare||f.chk.bad||f.chk.dang)?1:0;
+const openDb=async f=>new SQL.Database(await f.zip.file(f.mf.userDataBackup.databaseName||'userData.db').async('uint8array'));
+async function addFiles(fl){
+  log('Scarico le librerie necessarie…');
+  try{await loadLibs()}catch(e){log(e.message,1);return}
+  log('');
+  for(const f of fl){
+    try{
+      const zip=await JSZip.loadAsync(f);
+      const mf=JSON.parse(await zip.file('manifest.json').async('string'));
+      const it={name:f.name,zip,mf};
+      const d=await openDb(it);it.chk=inspect(d);d.close();
+      files.push(it);
+    }catch(e){console.error(e);log('"'+f.name+'" non è un backup JW Library valido.',1)}
+  }
+  // priorità: prima i backup coerenti, poi i più recenti; il primo fa da base
+  files.sort((a,b)=>flag(a)-flag(b)||ts(b.mf.userDataBackup.lastModifiedDate)-ts(a.mf.userDataBackup.lastModifiedDate));
+  render();
+}
+function render(){
+  $('list').innerHTML='';
+  files.forEach((f,i)=>{
+    const u=f.mf.userDataBackup, li=document.createElement('li');
+    li.innerHTML=`<div><b></b><small></small></div><div></div>`;
+    li.querySelector('b').textContent=f.name;
+    li.querySelector('small').textContent=(u.deviceName||'Dispositivo')+' · '+(u.lastModifiedDate||'').slice(0,10)+(flag(f)?` · ⚠ dati incoerenti (${f.chk.bare} evidenziazioni senza testo, ${f.chk.dang} verso posizioni inesistenti, ${f.chk.bad} note con collegamento errato): priorità minima`:'');
+    const r=li.lastChild;
+    if(i==0){const s=document.createElement('span');s.className='base';s.textContent='base';r.append(s)}
+    const x=document.createElement('button');x.textContent='×';x.title='Rimuovi';x.setAttribute('aria-label','Rimuovi '+f.name);
+    x.onclick=()=>{files.splice(i,1);render()};r.append(x);
+    $('list').append(li);
+  });
+  $('go').disabled=files.length<2;
+}
+$('inp').onchange=e=>{addFiles([...e.target.files]);e.target.value=''};
+const dz=$('drop');
+dz.ondragover=e=>{e.preventDefault();dz.classList.add('over')};
+dz.ondragleave=()=>dz.classList.remove('over');
+dz.ondrop=e=>{e.preventDefault();dz.classList.remove('over');addFiles([...e.dataTransfer.files].filter(f=>/\.jwlibrary$/i.test(f.name)))};
+
+// ==CORE==
+// Data/ora in formati misti (Z, +0200, +02:00) -> millisecondi UTC
+function ts(s){
+  const m=/^(\d{4})-(\d\d)-(\d\d)T(\d\d):(\d\d):(\d\d)(?:\.\d+)?(Z|[+-]\d\d:?\d\d)?$/.exec(s||'');
+  if(!m)return 0;
+  const z=m[7],off=!z||z==='Z'?0:(z[0]==='+'?1:-1)*(+z.slice(1,3)*60+ +z.slice(-2));
+  return Date.UTC(+m[1],m[2]-1,+m[3],+m[4],+m[5],+m[6])-off*60000;
+}
+const uuid=()=>crypto.randomUUID?crypto.randomUUID():'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g,c=>{const r=crypto.getRandomValues(new Uint8Array(1))[0]&15;return (c=='x'?r:(r&3|8)).toString(16)});
+function sha256js(data){
+  const K=[],H=[];let n=2,c=0;
+  while(c<64){let p=1;for(let d=2;d*d<=n;d++)if(n%d==0){p=0;break}
+    if(p){if(c<8)H[c]=(Math.pow(n,.5)%1)*4294967296|0;K[c++]=(Math.pow(n,1/3)%1)*4294967296|0}n++}
+  const l=data.length,nb=((l+9+63)>>6)<<6,buf=new Uint8Array(nb);buf.set(data);buf[l]=128;
+  const dv=new DataView(buf.buffer);dv.setUint32(nb-8,Math.floor(l/536870912));dv.setUint32(nb-4,(l<<3)>>>0);
+  const w=new Int32Array(64),rr=(x,k)=>(x>>>k)|(x<<(32-k));
+  for(let o=0;o<nb;o+=64){
+    for(let i=0;i<16;i++)w[i]=dv.getInt32(o+i*4);
+    for(let i=16;i<64;i++)w[i]=(w[i-16]+(rr(w[i-15],7)^rr(w[i-15],18)^(w[i-15]>>>3))+w[i-7]+(rr(w[i-2],17)^rr(w[i-2],19)^(w[i-2]>>>10)))|0;
+    let [a,b,cc,d,e,f,g,h]=H;
+    for(let i=0;i<64;i++){
+      const t1=(h+(rr(e,6)^rr(e,11)^rr(e,25))+((e&f)^(~e&g))+K[i]+w[i])|0;
+      const t2=((rr(a,2)^rr(a,13)^rr(a,22))+((a&b)^(a&cc)^(b&cc)))|0;
+      h=g;g=f;f=e;e=(d+t1)|0;d=cc;cc=b;b=a;a=(t1+t2)|0;
+    }
+    [a,b,cc,d,e,f,g,h].forEach((v,i)=>H[i]=(H[i]+v)|0);
+  }
+  const out=new Uint8Array(32),ov=new DataView(out.buffer);H.forEach((v,i)=>ov.setInt32(i*4,v));
+  return out;
+}
+async function sha256(u8){
+  if(window.crypto&&crypto.subtle){try{return new Uint8Array(await crypto.subtle.digest('SHA-256',u8))}catch(e){}}
+  return sha256js(u8);
+}
+const LK=['BookNumber','ChapterNumber','DocumentId','Track','IssueTagNumber','KeySymbol','MepsLanguage','Type','Specialty','Edition'];
+const q=(db,sql,p=[])=>{const s=db.prepare(sql);s.bind(p);const r=[];while(s.step())r.push(s.getAsObject());s.free();return r};
+const has=(db,t)=>q(db,"select 1 from sqlite_master where type='table' and name=?",[t]).length>0;
+const cnt=(db,t)=>has(db,t)?q(db,`select count(*) n from ${t}`)[0].n:0;
+const cache=new WeakMap();
+const cc=db=>{let m=cache.get(db);if(!m)cache.set(db,m={cols:{},st:{}});return m};
+function ins(db,t,o,drop=[],id=false){
+  const m=cc(db);
+  const cols=(m.cols[t]||(m.cols[t]=q(db,`pragma table_info(${t})`).map(c=>c.name))).filter(c=>c in o&&!drop.includes(c));
+  const und=cols.filter(c=>o[c]===undefined);
+  if(und.length)throw new Error('Dato non valido in '+t+' ('+und.join(', ')+')');
+  const k=t+':'+cols.join();
+  const s=m.st[k]||(m.st[k]=db.prepare(`insert into ${t}(${cols.join()}) values(${cols.map(()=>'?').join()})`));
+  s.run(cols.map(c=>o[c]));
+  if(id){const l=m.st.last||(m.st.last=db.prepare('select last_insert_rowid() id'));l.step();const r=l.getAsObject().id;l.reset();return r}
+}
+// Segnali di un backup danneggiato (per esempio da un'unione precedente fatta male)
+function inspect(db){
+  const bare=q(db,'select count(*) n from UserMark u where not exists(select 1 from BlockRange b where b.UserMarkId=u.UserMarkId)')[0].n;
+  const bad=q(db,'select count(*) n from Note n join UserMark u on u.UserMarkId=n.UserMarkId where n.LocationId is not u.LocationId')[0].n;
+  const dang=q(db,'select count(*) n from UserMark u where not exists(select 1 from Location l where l.LocationId=u.LocationId)')[0].n;
+  return {bare,bad,dang};
+}
+const key=r=>LK.map(k=>r[k]).join('|');
+const rk=b=>b.Identifier+'|'+b.StartToken+'|'+b.EndToken+'|'+b.BlockType;
+
+// Unisce B dentro A (A ha la precedenza nei conflitti senza data)
+function merge(A,B,st,bi,dam){
+  // Posizioni
+  const la=new Map(q(A,'select * from Location').map(r=>[key(r),r.LocationId])),L={};
+  for(const r of q(B,'select * from Location')){
+    const k=key(r);
+    if(!la.has(k)){la.set(k,ins(A,'Location',r,['LocationId'],true));st.loc++}
+    L[r.LocationId]=la.get(k);
+  }
+  // Etichette
+  const ta=new Map(q(A,'select * from Tag').map(r=>[r.Type+'|'+r.Name,r.TagId])),T={};
+  for(const r of q(B,'select * from Tag')){
+    const k=r.Type+'|'+r.Name;
+    if(!ta.has(k)){ta.set(k,ins(A,'Tag',r,['TagId'],true));st.tag++}
+    T[r.TagId]=ta.get(k);
+  }
+  // Evidenziazioni
+  const ua=new Map(q(A,'select UserMarkId,UserMarkGuid,ColorIndex from UserMark').map(r=>[r.UserMarkGuid,r]));
+  const rngA=new Map(),span=new Map();
+  const rid=new Map();
+  const add=(loc,b,id)=>{
+    if(!rid.has(id))rid.set(id,[]);rid.get(id).push(b);
+    if(!rngA.has(loc))rngA.set(loc,new Map());rngA.get(loc).set(rk(b),id);
+    const sk=loc+'|'+b.Identifier;if(!span.has(sk))span.set(sk,[]);span.get(sk).push([b.StartToken,b.EndToken]);
+  };
+  for(const r of q(A,'select u.LocationId,u.UserMarkId,b.Identifier,b.StartToken,b.EndToken,b.BlockType from UserMark u join BlockRange b on b.UserMarkId=u.UserMarkId'))add(r.LocationId,r,r.UserMarkId);
+  const brB=new Map();
+  for(const b of q(B,'select * from BlockRange')){if(!brB.has(b.UserMarkId))brB.set(b.UserMarkId,[]);brB.get(b.UserMarkId).push(b)}
+  const muL=new Map(q(A,'select UserMarkId,LocationId from UserMark').map(r=>[r.UserMarkId,r.LocationId]));
+  const U={},hasR=new Set(q(A,'select distinct UserMarkId from BlockRange').map(r=>r.UserMarkId));
+  for(const r of q(B,'select * from UserMark')){
+    const e=ua.get(r.UserMarkGuid),rs=brB.get(r.UserMarkId)||[],loc=L[r.LocationId];
+    if(e){
+      U[r.UserMarkId]=e.UserMarkId;st.mark_same++;if(e.ColorIndex!==r.ColorIndex)st.mark_color++;
+      if(!hasR.has(e.UserMarkId)&&rs.length&&loc!==undefined){ // la copia in A non ha testo evidenziato: la ripristino da B
+        A.run('update UserMark set LocationId=?,ColorIndex=?,StyleIndex=? where UserMarkId=?',[loc,r.ColorIndex,r.StyleIndex,e.UserMarkId]);
+        for(const b of rs){ins(A,'BlockRange',{...b,UserMarkId:e.UserMarkId},['BlockRangeId']);add(loc,b,e.UserMarkId)}
+        hasR.add(e.UserMarkId);muL.set(e.UserMarkId,loc);st.mark_fixed++;
+      }else if(rs.length&&loc!==undefined&&muL.get(e.UserMarkId)===loc){ // stessa evidenziazione: aggiungo i paragrafi che mancano
+        for(const b of rs)if(!(rid.get(e.UserMarkId)||[]).some(x=>x.Identifier===b.Identifier&&(x.StartToken==null||x.EndToken==null||b.StartToken==null||b.EndToken==null||!(b.EndToken<x.StartToken||b.StartToken>x.EndToken)))){ins(A,'BlockRange',{...b,UserMarkId:e.UserMarkId},['BlockRangeId']);add(loc,b,e.UserMarkId);st.range_added++}
+      }
+      continue;
+    }
+    if(!rs.length){st.mark_empty++;continue} // evidenziazione senza testo: non visibile, niente da unire
+    if(loc===undefined){st.mark_orphan++;continue} // la posizione non esiste nel backup: non recuperabile
+    const mp=rngA.get(loc)||new Map(),owners=new Set(rs.map(b=>mp.get(rk(b))));
+    if(rs.length&&!owners.has(undefined)&&owners.size===1){U[r.UserMarkId]=[...owners][0];st.mark_dup++;continue}
+    if(rs.some(b=>(span.get(loc+'|'+b.Identifier)||[]).some(([s,e2])=>b.StartToken!=null&&b.EndToken!=null&&s!=null&&e2!=null&&!(b.EndToken<s||b.StartToken>e2))))st.mark_overlap++;
+    const nid=ins(A,'UserMark',{...r,LocationId:loc},['UserMarkId'],true);
+    U[r.UserMarkId]=nid;ua.set(r.UserMarkGuid,{UserMarkId:nid,ColorIndex:r.ColorIndex});st.mark++;
+    for(const b of rs){ins(A,'BlockRange',{...b,UserMarkId:nid},['BlockRangeId']);add(loc,b,nid)}
+    hasR.add(nid);muL.set(nid,loc);
+  }
+  // Note (a parità di Guid vince la modifica più recente)
+  const na=new Map(q(A,'select NoteId,Guid,LastModified from Note').map(r=>[r.Guid,r])),N={};
+  for(const r of q(B,'select * from Note')){
+    const nl=r.LocationId==null?null:(L[r.LocationId]??null);
+    let um=null;
+    if(r.UserMarkId!=null){
+      um=U[r.UserMarkId]??null;
+      if(um!=null&&nl!=null&&muL.get(um)!==nl)um=null; // l'evidenziazione sta in un altro punto: collegamento errato
+      if(um==null)st.note_unlinked++;
+    }
+    const o={...r,LocationId:nl,UserMarkId:um};
+    const e=na.get(r.Guid);
+    if(!e){N[r.NoteId]=ins(A,'Note',o,['NoteId'],true);st.note++}
+    else{
+      N[r.NoteId]=e.NoteId;
+      if(ts(r.LastModified)>ts(e.LastModified)){
+        A.run('update Note set UserMarkId=?,LocationId=?,Title=?,Content=?,LastModified=?,BlockType=?,BlockIdentifier=? where NoteId=?',[o.UserMarkId,o.LocationId,o.Title,o.Content,o.LastModified,o.BlockType,o.BlockIdentifier,e.NoteId]);
+        st.note_upd++;
+      }
+    }
+  }
+  // Segnalibri (max 10 per pubblicazione)
+  const bk=q(A,'select * from Bookmark');
+  for(const r of q(B,'select * from Bookmark')){
+    const p=L[r.PublicationLocationId],l=L[r.LocationId];
+    if(p===undefined||l===undefined){st.skipped++;continue}
+    if(bk.some(x=>(x.PublicationLocationId==p&&x.LocationId==l&&x.BlockType==r.BlockType&&x.BlockIdentifier==r.BlockIdentifier)||(dam&&x.Title===r.Title&&x.Snippet===r.Snippet))){st.bm_dup++;continue}
+    const used=bk.filter(x=>x.PublicationLocationId==p).map(x=>x.Slot);
+    let s=r.Slot;
+    if(used.includes(s)){s=[...Array(10).keys()].find(i=>!used.includes(i));if(s===undefined){st.bm_lost.push(r.Title);continue}st.bm_moved++}
+    const o={...r,PublicationLocationId:p,LocationId:l,Slot:s};
+    ins(A,'Bookmark',o,['BookmarkId']);bk.push(o);st.bm++;
+  }
+  // Campi di testo
+  const ex=new Map(q(A,'select LocationId,TextTag,Value from InputField').map(r=>[r.LocationId+'|'+r.TextTag,r.Value]));
+  for(const r of q(B,'select * from InputField')){
+    const l=L[r.LocationId],k=l+'|'+r.TextTag;
+    if(l===undefined){st.skipped++;continue}
+    if(ex.has(k)){st.if_dup++;if(ex.get(k)!==r.Value)st.if_conf++;continue}
+    ins(A,'InputField',{...r,LocationId:l});ex.set(k,r.Value);st.if_n++;
+  }
+  // File multimediali indipendenti (dedotti dall'hash; nome file rinominato se già usato)
+  const imA=q(A,'select * from IndependentMedia'),byHash=new Map(imA.map(r=>[r.Hash,r])),paths=new Set(imA.map(r=>r.FilePath)),IM={},PATH={};
+  for(const r of q(B,'select * from IndependentMedia')){
+    let e=byHash.get(r.Hash);
+    if(!e){
+      let fp=r.FilePath;
+      if(paths.has(fp)){const d=fp.lastIndexOf('.');fp=uuid().toUpperCase()+(d>=0?fp.slice(d):'')}
+      e={IndependentMediaId:ins(A,'IndependentMedia',{...r,FilePath:fp},['IndependentMediaId'],true),FilePath:fp};
+      byHash.set(r.Hash,e);paths.add(fp);st.media.push({b:bi,src:r.FilePath,dst:fp});st.im++;
+    }
+    IM[r.IndependentMediaId]=e.IndependentMediaId;PATH[r.FilePath]=e.FilePath;
+  }
+  // Playlist
+  const acA=new Map(q(A,'select * from PlaylistItemAccuracy').map(r=>[r.Description,r.PlaylistItemAccuracyId])),AC={};
+  for(const r of q(B,'select * from PlaylistItemAccuracy')){
+    if(!acA.has(r.Description))acA.set(r.Description,ins(A,'PlaylistItemAccuracy',r,['PlaylistItemAccuracyId'],true));
+    AC[r.PlaylistItemAccuracyId]=acA.get(r.Description);
+  }
+  const sig=(db,it,lk,hs,ds)=>{
+    const id=[it.PlaylistItemId];
+    const med=q(db,'select * from PlaylistItemIndependentMediaMap where PlaylistItemId=?',id).map(r=>hs.get(r.IndependentMediaId)+':'+r.DurationTicks).sort();
+    const loc=q(db,'select * from PlaylistItemLocationMap where PlaylistItemId=?',id).map(r=>lk.get(r.LocationId)+':'+r.MajorMultimediaType+':'+r.BaseDurationTicks).sort();
+    const mk=q(db,'select * from PlaylistItemMarker where PlaylistItemId=?',id).map(m=>[m.Label,m.StartTimeTicks,m.DurationTicks,m.EndTransitionDurationTicks,
+      q(db,'select VerseId from PlaylistItemMarkerBibleVerseMap where PlaylistItemMarkerId=?',[m.PlaylistItemMarkerId]).map(x=>x.VerseId).sort().join(),
+      q(db,'select * from PlaylistItemMarkerParagraphMap where PlaylistItemMarkerId=?',[m.PlaylistItemMarkerId]).map(x=>[x.MepsDocumentId,x.ParagraphIndex,x.MarkerIndexWithinParagraph].join(':')).sort().join()].join('~')).sort();
+    return JSON.stringify([it.Label,it.StartTrimOffsetTicks,it.EndTrimOffsetTicks,ds.get(it.Accuracy),it.EndAction,med,loc,mk]);
+  };
+  const descA=new Map(q(A,'select * from PlaylistItemAccuracy').map(r=>[r.PlaylistItemAccuracyId,r.Description]));
+  const descB=new Map(q(B,'select * from PlaylistItemAccuracy').map(r=>[r.PlaylistItemAccuracyId,r.Description]));
+  const lkA=new Map([...la].map(([k,i])=>[i,k])),lkB=new Map(q(B,'select * from Location').map(r=>[r.LocationId,key(r)]));
+  const hsA=new Map(q(A,'select IndependentMediaId,Hash from IndependentMedia').map(r=>[r.IndependentMediaId,r.Hash]));
+  const hsB=new Map(q(B,'select IndependentMediaId,Hash from IndependentMedia').map(r=>[r.IndependentMediaId,r.Hash]));
+  const sa=new Map(),P={};
+  for(const it of q(A,'select * from PlaylistItem')){const s=sig(A,it,lkA,hsA,descA);if(!sa.has(s))sa.set(s,[]);sa.get(s).push(it.PlaylistItemId)}
+  for(const it of q(B,'select * from PlaylistItem')){
+    const s=sig(B,it,lkB,hsB,descB),m=sa.get(s);
+    if(m&&m.length){P[it.PlaylistItemId]=m.shift();st.pl_dup++;continue}
+    const nid=ins(A,'PlaylistItem',{...it,Accuracy:AC[it.Accuracy]??it.Accuracy,ThumbnailFilePath:it.ThumbnailFilePath==null?null:(PATH[it.ThumbnailFilePath]??it.ThumbnailFilePath)},['PlaylistItemId'],true);
+    P[it.PlaylistItemId]=nid;st.pl++;
+    const id=[it.PlaylistItemId];
+    for(const r of q(B,'select * from PlaylistItemIndependentMediaMap where PlaylistItemId=?',id)){if(IM[r.IndependentMediaId]===undefined){st.skipped++;continue}ins(A,'PlaylistItemIndependentMediaMap',{...r,PlaylistItemId:nid,IndependentMediaId:IM[r.IndependentMediaId]})}
+    for(const r of q(B,'select * from PlaylistItemLocationMap where PlaylistItemId=?',id)){if(L[r.LocationId]===undefined){st.skipped++;continue}ins(A,'PlaylistItemLocationMap',{...r,PlaylistItemId:nid,LocationId:L[r.LocationId]})}
+    for(const m2 of q(B,'select * from PlaylistItemMarker where PlaylistItemId=?',id)){
+      const mid=ins(A,'PlaylistItemMarker',{...m2,PlaylistItemId:nid},['PlaylistItemMarkerId'],true);
+      for(const x of q(B,'select * from PlaylistItemMarkerBibleVerseMap where PlaylistItemMarkerId=?',[m2.PlaylistItemMarkerId]))ins(A,'PlaylistItemMarkerBibleVerseMap',{...x,PlaylistItemMarkerId:mid});
+      for(const x of q(B,'select * from PlaylistItemMarkerParagraphMap where PlaylistItemMarkerId=?',[m2.PlaylistItemMarkerId]))ins(A,'PlaylistItemMarkerParagraphMap',{...x,PlaylistItemMarkerId:mid});
+    }
+  }
+  // Assegnazioni delle etichette (note, posizioni, elementi di playlist)
+  const tm=q(A,'select * from TagMap'),have=new Set(tm.map(x=>[x.TagId,x.NoteId,x.LocationId,x.PlaylistItemId].join('|'))),maxp={};
+  for(const x of tm)maxp[x.TagId]=Math.max(maxp[x.TagId]??-1,x.Position);
+  for(const r of q(B,'select * from TagMap').sort((a,b)=>a.TagId-b.TagId||a.Position-b.Position)){
+    const t=T[r.TagId],n=r.NoteId==null?null:N[r.NoteId],l=r.LocationId==null?null:L[r.LocationId],pl=r.PlaylistItemId==null?null:P[r.PlaylistItemId];
+    if(t===undefined||n===undefined||l===undefined||pl===undefined){st.skipped++;continue}
+    const k=[t,n,l,pl].join('|');
+    if(have.has(k)){st.tm_dup++;continue}
+    maxp[t]=(maxp[t]??-1)+1;
+    ins(A,'TagMap',{PlaylistItemId:pl,LocationId:l,NoteId:n,TagId:t,Position:maxp[t]});
+    have.add(k);st.tm++;
+  }
+}
+
+// Unisce tutti i database; lancia un errore se qualcosa non torna
+function mergeAll(A,Bs,onStep){
+  const st={loc:0,tag:0,mark:0,mark_same:0,mark_color:0,mark_dup:0,mark_overlap:0,note:0,note_upd:0,bm:0,bm_dup:0,bm_moved:0,bm_lost:[],if_n:0,if_dup:0,if_conf:0,tm:0,tm_dup:0,pl:0,pl_dup:0,im:0,mark_fixed:0,mark_empty:0,mark_orphan:0,range_added:0,note_unlinked:0,skipped:0,media:[]};
+  const fk0=q(A,'pragma foreign_key_check').length; // eventuali problemi già presenti nel backup di base
+  A.run('pragma foreign_keys=on');
+  A.run('begin');
+  try{Bs.forEach((B,i)=>{onStep&&onStep(i);const c=inspect(B);merge(A,B,st,i,!!(c.bare||c.bad||c.dang))});A.run('commit')}
+  catch(e){try{A.run('rollback')}catch(_){}throw e}
+  const fk=q(A,'pragma foreign_key_check');
+  if(fk.length>fk0)throw new Error('Controllo di coerenza fallito (chiavi esterne): '+(fk.length-fk0)+' righe non valide create dall\'unione.');
+  const ic=Object.values(q(A,'pragma integrity_check')[0])[0];
+  if(ic!=='ok')throw new Error('Controllo di integrità fallito: '+ic);
+  for(const s of Object.values(cc(A).st))s.free();
+  cache.delete(A);
+  return st;
+}
+// ==/CORE==
+
+const pad=n=>String(n).padStart(2,'0');
+function stamp(d){const o=-d.getTimezoneOffset(),a=Math.abs(o);
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}${o<0?'-':'+'}${pad(a/60|0)}${pad(a%60)}`}
+
+$('go').onclick=async()=>{
+  $('out').innerHTML='';$('go').disabled=true;
+  try{
+    log('Controllo compatibilità…');
+    if(new Set(files.map(f=>f.mf.userDataBackup.schemaVersion)).size>1)
+      throw new Error('I backup hanno versioni diverse del database. Aggiorna JW Library su tutti i dispositivi, crea di nuovo i backup e riprova.');
+    const base=files[0], A=await openDb(base), Bs=[];
+    for(const f of files.slice(1))Bs.push(await openDb(f));
+    const st=mergeAll(A,Bs,i=>log(`Unisco ${files[i+1].name} (${i+1}/${Bs.length})…`));
+    log('Preparo il file…');
+    const need=q(A,'select FilePath from IndependentMedia').map(r=>r.FilePath);
+    const db=A.export();A.close();Bs.forEach(b=>b.close());
+    const d=new Date(), day=`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+    const hash=[...await sha256(db)].map(b=>b.toString(16)).join(''); // stesso formato dell'app (senza zeri iniziali per byte)
+    const mf=JSON.parse(JSON.stringify(base.mf));
+    mf.name='UserdataBackup_'+day+'_merged.jwlibrary';
+    mf.creationDate=stamp(d);
+    mf.userDataBackup.lastModifiedDate=stamp(d);
+    mf.userDataBackup.hash=hash;
+    mf.userDataBackup.deviceName=base.mf.userDataBackup.deviceName;
+    const dbName=mf.userDataBackup.databaseName||'userData.db';
+    const out=new JSZip();
+    out.file('manifest.json',JSON.stringify(mf));
+    out.file(dbName,db);
+    for(const n of Object.keys(base.zip.files)){
+      const zf=base.zip.files[n];
+      if(zf.dir||n==='manifest.json'||n===dbName)continue;
+      out.file(n,await zf.async('uint8array'));
+    }
+    for(const m of st.media){
+      const zf=files[m.b+1].zip.file(m.src);
+      if(!zf)throw new Error('File multimediale mancante nel backup: '+m.src);
+      out.file(m.dst,await zf.async('uint8array'));
+    }
+    const miss=need.filter(n=>!out.file(n));
+    if(miss.length)throw new Error('File multimediali mancanti nel backup unito: '+miss.join(', '));
+    const zipped=await out.generateAsync({type:'blob',compression:'DEFLATE',mimeType:'application/octet-stream'});
+    const blob=new Blob([zipped],{type:'application/octet-stream'}); // tipo neutro: Safari non aggiunge «.zip» al nome
+    const a=document.createElement('a');
+    a.href=URL.createObjectURL(blob);a.download=mf.name;a.textContent='Scarica il backup unito';
+    $('out').append(a);
+    let t=`Fatto. Aggiunti dagli altri backup: ${st.note} note, ${st.mark} evidenziazioni, ${st.bm} segnalibri, ${st.tag} etichette, ${st.tm} assegnazioni di etichette, ${st.if_n} campi di testo, ${st.pl} elementi di playlist.`;
+    t+=`\nGià presenti e non duplicati: ${st.mark_same+st.mark_dup} evidenziazioni, ${st.bm_dup} segnalibri, ${st.tm_dup} assegnazioni di etichette, ${st.pl_dup} elementi di playlist.`;
+    if(st.note_upd)t+=`\n${st.note_upd} note erano presenti in più backup con testo diverso: ho tenuto la versione modificata più di recente.`;
+    if(st.mark_color)t+=`\n${st.mark_color} evidenziazioni avevano colori diversi tra i backup: ho tenuto quello del backup base.`;
+    if(st.if_conf)t+=`\n${st.if_conf} campi di testo avevano valori diversi: ho tenuto quello del backup base.`;
+    if(st.mark_fixed)t+=`\n${st.mark_fixed} evidenziazioni senza testo in un backup sono state ripristinate da un altro.`;
+    if(st.mark_empty)t+=`\n${st.mark_empty} evidenziazioni senza testo (non visibili) in un backup danneggiato sono state ignorate.`;
+    if(st.range_added)t+=`\n${st.range_added} paragrafi evidenziati presenti solo in un backup sono stati aggiunti alle evidenziazioni già esistenti.`;
+    if(st.mark_orphan)t+=`\n${st.mark_orphan} evidenziazioni puntavano a posizioni inesistenti in un backup danneggiato e non si possono recuperare.`;
+    if(st.note_unlinked)t+=`\n${st.note_unlinked} note avevano un collegamento errato a un'evidenziazione: le ho tenute senza collegamento.`;
+    if(st.skipped)t+=`\n${st.skipped} elementi con riferimenti non validi in un backup sono stati ignorati.`;
+    if(st.bm_lost.length)t+=`\nNon inseriti perché la pubblicazione ha già 10 segnalibri: ${[...new Set(st.bm_lost)].join('; ')}.`;
+    log(t+'\nOra apri il file su iPhone o iPad e ripristinalo in JW Library.');
+  }catch(e){console.error(e);log('Errore: '+e.message,1)}
+  $('go').disabled=files.length<2;
+};
+</script>
+</body>
+</html>
