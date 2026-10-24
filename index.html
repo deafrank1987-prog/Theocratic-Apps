@@ -3,6 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline' 'wasm-unsafe-eval' https://cdnjs.cloudflare.com; connect-src https://cdnjs.cloudflare.com; style-src 'unsafe-inline'; img-src data:; base-uri 'none'; form-action 'none'; object-src 'none'; frame-src 'none'">
 <title>Unisci backup JW Library</title>
 <style>
 :root{--bg:#eef1f6;--card:#fff;--ink:#1b2430;--mute:#5b6676;--line:#d3d9e3;--acc:#2f5bea;--accink:#fff;--err:#b3261e}
@@ -43,7 +44,7 @@ li button{background:none;border:0;color:var(--mute);font-size:1.2rem;cursor:poi
 <body>
 <main>
 <h1>Unisci backup JW Library</h1>
-<p class="lead">Carica due o più file .jwlibrary (per esempio da iPhone e iPad) e ottieni un unico backup da ripristinare. Tutto avviene nel tuo browser: i file non vengono inviati a nessun server.</p>
+<p class="lead">Carica due o più file .jwlibrary (per esempio da iPhone e iPad) e ottieni un unico backup da ripristinare. Tutto avviene nel tuo browser: i file non vengono inviati a nessun server. Il browser è istruito a bloccare qualsiasi collegamento diverso dal download delle librerie da cdnjs.</p>
 
 <label id="drop"><input id="inp" type="file" accept=".jwlibrary" multiple>
 <strong>Scegli i file di backup o trascinali qui</strong><span>Almeno due file .jwlibrary</span></label>
