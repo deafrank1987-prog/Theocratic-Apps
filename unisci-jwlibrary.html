@@ -7,6 +7,7 @@
 <title>Unisci backup JW Library</title>
 <meta name="apple-mobile-web-app-title" content="Unisci JW">
 <link rel="apple-touch-icon" href="icona-unisci.png">
+<link rel="icon" href="icona-unisci.png">
 <style>
 :root{--bg:#eef1f6;--card:#fff;--ink:#1b2430;--mute:#5b6676;--line:#d3d9e3;--acc:#2f5bea;--accink:#fff;--err:#b3261e}
 @media(prefers-color-scheme:dark){:root{--bg:#12161d;--card:#1b212b;--ink:#e8ecf3;--mute:#98a3b5;--line:#2c3544;--acc:#7b9bff;--accink:#0d1220;--err:#ff8a80}}
@@ -17,6 +18,7 @@ main{max-width:640px;margin:0 auto}
 .back:hover{color:var(--acc)}
 .addbox{margin:0 0 18px;padding:12px 14px;background:var(--card);border:1px solid var(--line);border-left:4px solid var(--acc);border-radius:8px;font-size:.92rem}
 .addbox[hidden]{display:none}
+.linkbtn{border:0;background:none;color:var(--acc);font:600 .9rem inherit;cursor:pointer;padding:0;text-decoration:underline}
 .addbox p{margin:4px 0 8px}
 .addbox button{border:0;background:none;color:var(--acc);font:600 .9rem inherit;cursor:pointer;padding:0}
 h1{font-size:1.7rem;margin:0 0 6px;letter-spacing:-.01em}
@@ -66,6 +68,7 @@ li button{background:none;border:0;color:var(--mute);font-size:1.2rem;cursor:poi
 
 <p class="note">Vengono uniti note, evidenziazioni, segnalibri, etichette e campi di testo. Il backup con la data più recente fa da base e ne vengono mantenuti nome del dispositivo e miniatura. Vengono unite anche le playlist, con i loro file multimediali. Note, evidenziazioni e segnalibri di pubblicazioni che non hai nella libreria vengono mantenuti nel file: restano nel database del backup. Conserva sempre i file originali.</p>
 <p class="warn"><strong>Importante:</strong> i backup da unire devono essere stati creati con la stessa versione aggiornata di JW Library. Aggiorna l'app su tutti i dispositivi e rifai i backup prima di unirli: se le versioni sono diverse, la pagina si ferma con un avviso.</p>
+<p class="note"><button type="button" class="linkbtn" id="addbtn">Aggiungi alla schermata Home</button></p>
 <details class="gl">
 <summary>Cosa significano i messaggi</summary>
 <div class="in">
@@ -476,11 +479,14 @@ function addHelp(ua,plat,touch){
   if(/Android/.test(ua))return 'Da Chrome, tocca il menu ⋮ in alto a destra e scegli «Aggiungi a schermata Home» (oppure «Installa app»), poi conferma.';
   return 'Su computer, in Chrome o Edge usa l\'icona di installazione nella barra degli indirizzi oppure il menu ⋮ → «Installa pagina come app». In Safari su Mac scegli File → «Aggiungi al Dock».';
 }
-if(typeof location!=='undefined'&&location.hash==='#aggiungi'){
+function showAdd(){
   $('addtxt').textContent=addHelp(navigator.userAgent,navigator.platform,navigator.maxTouchPoints);
   $('add').hidden=false;
-  $('addok').onclick=()=>{$('add').hidden=true};
+  if(window.scrollTo)window.scrollTo(0,0);
 }
+$('addok').onclick=()=>{$('add').hidden=true};
+$('addbtn').onclick=showAdd;
+if(typeof location!=='undefined'&&location.hash==='#aggiungi')showAdd();
 </script>
 </body>
 </html>
