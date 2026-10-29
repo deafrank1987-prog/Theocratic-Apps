@@ -3,8 +3,10 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline' 'wasm-unsafe-eval' https://cdnjs.cloudflare.com; connect-src https://cdnjs.cloudflare.com; style-src 'unsafe-inline'; img-src data:; base-uri 'none'; form-action 'none'; object-src 'none'; frame-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline' 'wasm-unsafe-eval' https://cdnjs.cloudflare.com; connect-src https://cdnjs.cloudflare.com; style-src 'unsafe-inline'; img-src 'self' data:; base-uri 'none'; form-action 'none'; object-src 'none'; frame-src 'none'">
 <title>Unisci backup JW Library</title>
+<meta name="apple-mobile-web-app-title" content="Unisci JW">
+<link rel="apple-touch-icon" href="icona-unisci.png">
 <style>
 :root{--bg:#eef1f6;--card:#fff;--ink:#1b2430;--mute:#5b6676;--line:#d3d9e3;--acc:#2f5bea;--accink:#fff;--err:#b3261e}
 @media(prefers-color-scheme:dark){:root{--bg:#12161d;--card:#1b212b;--ink:#e8ecf3;--mute:#98a3b5;--line:#2c3544;--acc:#7b9bff;--accink:#0d1220;--err:#ff8a80}}
@@ -13,6 +15,10 @@ body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.55 system-ui,-ap
 main{max-width:640px;margin:0 auto}
 .back{display:inline-block;margin-bottom:14px;color:var(--mute);text-decoration:none;font-size:.92rem}
 .back:hover{color:var(--acc)}
+.addbox{margin:0 0 18px;padding:12px 14px;background:var(--card);border:1px solid var(--line);border-left:4px solid var(--acc);border-radius:8px;font-size:.92rem}
+.addbox[hidden]{display:none}
+.addbox p{margin:4px 0 8px}
+.addbox button{border:0;background:none;color:var(--acc);font:600 .9rem inherit;cursor:pointer;padding:0}
 h1{font-size:1.7rem;margin:0 0 6px;letter-spacing:-.01em}
 p.lead{color:var(--mute);margin:0 0 22px}
 #drop{display:block;background:var(--card);border:2px dashed var(--line);border-radius:14px;padding:34px 18px;text-align:center;cursor:pointer}
@@ -46,6 +52,7 @@ li button{background:none;border:0;color:var(--mute);font-size:1.2rem;cursor:poi
 <body>
 <main>
 <a class="back" href="index.html">← Theocratic Apps</a>
+<div class="addbox" id="add" hidden><strong>Aggiungi alla schermata Home</strong><p id="addtxt"></p><button type="button" id="addok">Chiudi</button></div>
 <h1>Unisci backup JW Library</h1>
 <p class="lead">Carica due o più file .jwlibrary (per esempio da iPhone e iPad) e ottieni un unico backup da ripristinare. Tutto avviene nel tuo browser: i file non vengono inviati a nessun server.</p>
 
@@ -462,6 +469,18 @@ $('go').onclick=async()=>{
   }catch(e){console.error(e);log('Errore: '+e.message,1)}
   $('go').disabled=files.length<2;
 };
+
+// ---------- istruzioni "Aggiungi a Home" (si aprono dal pulsante della dashboard) ----------
+function addHelp(ua,plat,touch){
+  if(/iPhone|iPad|iPod/.test(ua)||(plat==='MacIntel'&&touch>1))return 'Da Safari, tocca il pulsante Condividi (il quadrato con la freccia verso l\'alto), scorri l\'elenco e scegli «Aggiungi alla schermata Home», poi «Aggiungi». Su iPhone e iPad l\'icona riaprirà questa pagina in Safari.';
+  if(/Android/.test(ua))return 'Da Chrome, tocca il menu ⋮ in alto a destra e scegli «Aggiungi a schermata Home» (oppure «Installa app»), poi conferma.';
+  return 'Su computer, in Chrome o Edge usa l\'icona di installazione nella barra degli indirizzi oppure il menu ⋮ → «Installa pagina come app». In Safari su Mac scegli File → «Aggiungi al Dock».';
+}
+if(typeof location!=='undefined'&&location.hash==='#aggiungi'){
+  $('addtxt').textContent=addHelp(navigator.userAgent,navigator.platform,navigator.maxTouchPoints);
+  $('add').hidden=false;
+  $('addok').onclick=()=>{$('add').hidden=true};
+}
 </script>
 </body>
 </html>
