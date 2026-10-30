@@ -35,6 +35,8 @@ li small{color:var(--mute)}
 li button{background:none;border:0;color:var(--mute);font-size:1.2rem;cursor:pointer;padding:4px 8px}
 .base{font-size:.8rem;color:var(--acc);white-space:nowrap}
 .go{width:100%;border:0;border-radius:10px;background:var(--acc);color:var(--accink);font:600 1rem inherit;padding:14px;cursor:pointer}
+.okw{display:block;margin:0 0 12px;font-size:.9rem}
+.okw[hidden]{display:none}
 .go:disabled{opacity:.4;cursor:not-allowed}
 :focus-visible{outline:3px solid var(--acc);outline-offset:2px}
 #log{margin-top:18px;font-size:.9rem;color:var(--mute);white-space:pre-line}
@@ -58,16 +60,17 @@ li button{background:none;border:0;color:var(--mute);font-size:1.2rem;cursor:poi
 <h1>Unisci backup JW Library</h1>
 <p class="lead">Carica due o più file .jwlibrary (per esempio da iPhone e iPad) e ottieni un unico backup da ripristinare. Tutto avviene nel tuo browser: i file non vengono inviati a nessun server.</p>
 
-<label id="drop"><input id="inp" type="file" accept=".jwlibrary" multiple>
-<strong>Scegli i file di backup o trascinali qui</strong><span>Almeno due file .jwlibrary</span></label>
+<label id="drop"><input id="inp" type="file" accept=".jwlibrary,.zip" multiple>
+<strong>Scegli i file di backup o trascinali qui</strong><span>Almeno due file .jwlibrary (vanno bene anche .zip)</span></label>
 
 <ul id="list"></ul>
+<label class="okw" id="okwrow" hidden><input type="checkbox" id="okw"> Ho capito: uno o più backup hanno un formato non verificato. Unisci comunque; conserverò i backup originali.</label>
 <button class="go" id="go" disabled>Unisci backup</button>
 <div id="log" role="status"></div>
 <div id="out"></div>
 
 <p class="note">Vengono uniti note, evidenziazioni, segnalibri, etichette e campi di testo. Il backup con la data più recente fa da base e ne vengono mantenuti nome del dispositivo e miniatura. Vengono unite anche le playlist, con i loro file multimediali. Note, evidenziazioni e segnalibri di pubblicazioni che non hai nella libreria vengono mantenuti nel file: restano nel database del backup. Conserva sempre i file originali.</p>
-<p class="warn"><strong>Importante:</strong> i backup da unire devono essere stati creati con la stessa versione aggiornata di JW Library. Aggiorna l'app su tutti i dispositivi e rifai i backup prima di unirli: se le versioni sono diverse, la pagina si ferma con un avviso.</p>
+<p class="warn"><strong>Importante:</strong> puoi unire backup di iPhone, iPad e Android, anche con formati diversi: il file unito usa quello più recente. I formati 14 e 16 sono verificati. Con formati più recenti di quelli che conosco la pagina prova a unirli in modo generico, ma ti chiede una conferma. Se la struttura è troppo diversa, l'unione si ferma con un avviso.</p>
 <p class="note"><button type="button" class="linkbtn" id="addbtn">Aggiungi alla schermata Home</button></p>
 <details class="gl">
 <summary>Cosa significano i messaggi</summary>
@@ -95,9 +98,11 @@ li button{background:none;border:0;color:var(--mute);font-size:1.2rem;cursor:poi
 <dl>
 <dt>Impossibile scaricare le librerie</dt><dd>Manca la connessione a internet, oppure è bloccato il sito che ospita le librerie (cdnjs).</dd>
 <dt>… non è un backup JW Library valido</dt><dd>Il file non è un .jwlibrary leggibile.</dd>
-<dt>… usa la versione N del database, che questa pagina non conosce</dt><dd>JW Library è stata aggiornata e i suoi backup hanno un formato nuovo. L'unione si ferma per non rovinare i tuoi dati: la pagina va aggiornata prima di poter unire quei backup.</dd>
+<dt>formato N più recente della 16 / tabelle nuove</dt><dd>JW Library ha cambiato il formato dei backup. La pagina prova a unirlo in modo generico: copia le colonne nuove e collega le tabelle nuove tramite le chiavi dichiarate dal database. Ti chiede una conferma e dopo l'unione fa i controlli di integrità, ma non può essere sicura di capire il significato dei dati nuovi: ripristina prima su un solo dispositivo.</dd>
+<dt>… manca la tabella o la colonna X</dt><dd>Il backup ha un formato troppo vecchio o non riconosciuto. L'unione si ferma.</dd>
+<dt>formato N non verificato</dt><dd>Il formato è tra quelli che la pagina sa trattare, ma non l'ho provato su backup veri: controlla bene il risultato prima di ripristinarlo.</dd>
+<dt>… ha un database identico a …: lo ignoro</dt><dd>Hai caricato due volte lo stesso backup (per esempio due download dello stesso file).</dd>
 <dt>… contiene dati che questa pagina non sa unire</dt><dd>Nel backup ci sono dati di un tipo che la pagina non gestisce. Anche qui l'unione si ferma e la pagina va aggiornata.</dd>
-<dt>I backup hanno versioni diverse del database</dt><dd>Aggiorna JW Library su tutti i dispositivi, rifai i backup e riprova.</dd>
 <dt>File multimediale mancante</dt><dd>Una playlist cita un file che non è dentro i backup.</dd>
 <dt>Dato non valido in…, Controllo di coerenza o di integrità fallito</dt><dd>Non dovrebbero comparire. Se succede, la pagina non ti dà il file, per non rovinare i tuoi dati.</dd>
 </dl>
@@ -125,26 +130,44 @@ async function loadLibs(){
 
 // ---------- gestione file ----------
 const flag=f=>(f.chk.bare||f.chk.bad||f.chk.dang)?1:0;
-const openDb=async f=>new SQL.Database(await f.zip.file(f.mf.userDataBackup.databaseName||'userData.db').async('uint8array'));
+const dbName=f=>f.mf.userDataBackup.databaseName||'userData.db';
+async function readDb(f){
+  const n=dbName(f),w=f.zip.file(n+'-wal');
+  return prepDb(await f.zip.file(n).async('uint8array'),w?await w.async('uint8array'):null);
+}
+const openDb=async f=>new SQL.Database(await readDb(f));
 async function addFiles(fl){
   log('Scarico le librerie necessarie…');
   try{await loadLibs()}catch(e){log(e.message,1);return}
   log('');
+  const errs=[],infos=[];
   for(const f of fl){
     try{
       const zip=await JSZip.loadAsync(f);
       const mf=JSON.parse(await zip.file('manifest.json').async('string'));
       const it={name:f.name,zip,mf};
-      const d=await openDb(it);
-      const bad=checkSupported(d,mf);
-      if(bad){d.close();log('«'+f.name+'» '+bad,1);continue}
-      it.chk=inspect(d);d.close();
+      const bytes=await readDb(it);
+      const c=checkSupported(new SQL.Database(bytes),mf);
+      if(c.err){errs.push('«'+f.name+'» '+c.err);continue}
+      const sig=[...await sha256(bytes)].map(b=>b.toString(16).padStart(2,'0')).join('');
+      const dup=files.find(x=>x.sig===sig);
+      if(dup){infos.push('«'+f.name+'» ha un database identico a «'+dup.name+'»: lo ignoro.');continue}
+      const d=new SQL.Database(bytes);
+      it.chk=inspect(d);d.close();it.sig=sig;it.warn=c.warn;
       files.push(it);
-    }catch(e){console.error(e);log('"'+f.name+'" non è un backup JW Library valido.',1)}
+    }catch(e){console.error(e);errs.push('«'+f.name+'» non è un backup JW Library valido.')}
   }
-  // priorità: prima i backup coerenti, poi i più recenti; il primo fa da base
-  files.sort((a,b)=>flag(a)-flag(b)||ts(b.mf.userDataBackup.lastModifiedDate)-ts(a.mf.userDataBackup.lastModifiedDate));
+  // base = formato più recente; a parità, prima i backup coerenti, poi i più recenti
+  files.sort((a,b)=>(b.mf.userDataBackup.schemaVersion-a.mf.userDataBackup.schemaVersion)||flag(a)-flag(b)||ts(b.mf.userDataBackup.lastModifiedDate)-ts(a.mf.userDataBackup.lastModifiedDate));
+  const byPrio=[...files].sort((a,b)=>flag(a)-flag(b)||ts(b.mf.userDataBackup.lastModifiedDate)-ts(a.mf.userDataBackup.lastModifiedDate));
+  files.forEach(f=>f.rank=byPrio.indexOf(f)); // 0 = backup più coerente e recente: vince nei conflitti
+  if(errs.length||infos.length)log(errs.concat(infos).join('\n'),errs.length>0);
   render();
+}
+function upd(){
+  const need=files.some(f=>f.warn);
+  $('okwrow').hidden=!need;if(!need)$('okw').checked=false;
+  $('go').disabled=files.length<2||(need&&!$('okw').checked);
 }
 function render(){
   $('list').innerHTML='';
@@ -152,20 +175,21 @@ function render(){
     const u=f.mf.userDataBackup, li=document.createElement('li');
     li.innerHTML=`<div><b></b><small></small></div><div></div>`;
     li.querySelector('b').textContent=f.name;
-    li.querySelector('small').textContent=(u.deviceName||'Dispositivo')+' · '+(u.lastModifiedDate||'').slice(0,10)+' · formato '+u.schemaVersion+(flag(f)?` · ⚠ dati incoerenti (${f.chk.bare} evidenziazioni senza testo, ${f.chk.dang} verso posizioni inesistenti, ${f.chk.bad} note con collegamento errato): priorità minima`:'');
+    li.querySelector('small').textContent=(u.deviceName||'Dispositivo')+' · '+(u.lastModifiedDate||'').slice(0,10)+' · formato '+u.schemaVersion+(f.warn?' · ⚠ '+f.warn:'')+(flag(f)?` · ⚠ dati incoerenti (${f.chk.bare} evidenziazioni senza testo, ${f.chk.dang} verso posizioni inesistenti, ${f.chk.bad} note con collegamento errato): priorità minima`:'');
     const r=li.lastChild;
     if(i==0){const s=document.createElement('span');s.className='base';s.textContent='base';r.append(s)}
     const x=document.createElement('button');x.textContent='×';x.title='Rimuovi';x.setAttribute('aria-label','Rimuovi '+f.name);
     x.onclick=()=>{files.splice(i,1);render()};r.append(x);
     $('list').append(li);
   });
-  $('go').disabled=files.length<2;
+  upd();
 }
+$('okw').onchange=upd;
 $('inp').onchange=e=>{addFiles([...e.target.files]);e.target.value=''};
 const dz=$('drop');
 dz.ondragover=e=>{e.preventDefault();dz.classList.add('over')};
 dz.ondragleave=()=>dz.classList.remove('over');
-dz.ondrop=e=>{e.preventDefault();dz.classList.remove('over');addFiles([...e.dataTransfer.files].filter(f=>/\.jwlibrary$/i.test(f.name)))};
+dz.ondrop=e=>{e.preventDefault();dz.classList.remove('over');addFiles([...e.dataTransfer.files].filter(f=>/\.(jwlibrary|zip)$/i.test(f.name)))};
 
 // ==CORE==
 // Data/ora in formati misti (Z, +0200, +02:00) -> millisecondi UTC
@@ -203,16 +227,68 @@ async function sha256(u8){
 }
 const LK=['BookNumber','ChapterNumber','DocumentId','Track','IssueTagNumber','KeySymbol','MepsLanguage','Type','Specialty','Edition'];
 const q=(db,sql,p=[])=>{const s=db.prepare(sql);s.bind(p);const r=[];while(s.step())r.push(s.getAsObject());s.free();return r};
-// Versione del database che questa pagina sa unire. Con una versione diversa o tabelle sconosciute l'unione si ferma, per non perdere dati in silenzio.
-const SUPPORTED=[16];
-const KNOWN=["BlockRange", "Bookmark", "IndependentMedia", "InputField", "LastModified", "Location", "Note", "PlaylistItem", "PlaylistItemAccuracy", "PlaylistItemIndependentMediaMap", "PlaylistItemLocationMap", "PlaylistItemMarker", "PlaylistItemMarkerBibleVerseMap", "PlaylistItemMarkerParagraphMap", "Tag", "TagMap", "UserMark", "grdb_migrations"];
+// Formati del database: 14 e 16 verificati su backup veri; le altre versioni fino alla 16 sono accettate solo se la struttura è quella attesa (con un avviso).
+const MAXV=16,VERIFIED=[14,16];
+const KNOWN=["BlockRange","Bookmark","IndependentMedia","InputField","LastModified","Location","Note","PlaylistItem","PlaylistItemAccuracy","PlaylistItemIndependentMediaMap","PlaylistItemLocationMap","PlaylistItemMarker","PlaylistItemMarkerBibleVerseMap","PlaylistItemMarkerParagraphMap","Tag","TagMap","UserMark"];
+const IGNORED=["android_metadata","room_master_table","grdb_migrations"]; // tabelle di servizio di Android e iOS: non contengono dati dell'utente
+const REQ={
+  Location:["LocationId","BookNumber","ChapterNumber","DocumentId","Track","IssueTagNumber","KeySymbol","MepsLanguage","Type"],
+  Tag:["TagId","Type","Name"],
+  UserMark:["UserMarkId","ColorIndex","LocationId","StyleIndex","UserMarkGuid","Version"],
+  BlockRange:["BlockRangeId","BlockType","Identifier","StartToken","EndToken","UserMarkId"],
+  Note:["NoteId","Guid","UserMarkId","LocationId","Title","Content","LastModified","BlockType","BlockIdentifier"],
+  Bookmark:["BookmarkId","LocationId","PublicationLocationId","Slot","Title","Snippet","BlockType","BlockIdentifier"],
+  InputField:["LocationId","TextTag","Value"],
+  TagMap:["TagMapId","TagId","Position","NoteId","LocationId"]
+};
 function checkSupported(db,mf){
   const v=mf&&mf.userDataBackup&&mf.userDataBackup.schemaVersion;
-  if(!SUPPORTED.includes(v))return 'usa la versione '+v+' del database, che questa pagina non conosce (supporta solo la '+SUPPORTED.join(', ')+'). Per non rovinare i tuoi dati non unisco: la pagina va aggiornata.';
-  const extra=q(db,"select name from sqlite_master where type='table' and name not like 'sqlite_%'").map(r=>r.name).filter(n=>!KNOWN.includes(n));
-  if(extra.length)return 'contiene dati che questa pagina non sa unire ('+extra.join(', ')+'). Per non perdere dati non unisco: la pagina va aggiornata.';
-  return null;
+  if(!Number.isInteger(v))return {err:'ha un manifest senza una versione del database riconoscibile.'};
+  const tabs=q(db,"select name from sqlite_master where type='table' and name not like 'sqlite_%'").map(r=>r.name);
+  for(const [t,cols] of Object.entries(REQ)){
+    if(!tabs.includes(t))return {err:'è nel formato '+v+' ma manca la tabella '+t+': formato troppo diverso o non riconosciuto, non lo unisco per non rovinare i tuoi dati.'};
+    const have=q(db,'pragma table_info('+t+')').map(c=>c.name),miss=cols.filter(c=>!have.includes(c));
+    if(miss.length)return {err:'è nel formato '+v+' ma in '+t+' manca '+miss.join(', ')+': formato troppo diverso o non riconosciuto, non lo unisco per non rovinare i tuoi dati.'};
+  }
+  const extra=tabs.filter(n=>!KNOWN.includes(n)&&!IGNORED.includes(n)),w=[];
+  if(v>MAXV)w.push('formato '+v+' più recente della '+MAXV+' che conosco');
+  else if(!VERIFIED.includes(v))w.push('formato '+v+' non verificato');
+  if(extra.length)w.push('tabelle nuove ('+extra.join(', ')+') unite in modo generico');
+  return {err:null,warn:w.length?w.join('; ')+': controlla bene il risultato':null};
 }
+// Android salva il database in modalità WAL: i dati più recenti possono stare nel file «-wal». Li riapplico al database prima di aprirlo.
+function prepDb(db,wal){
+  let out=db;
+  if(wal&&wal.length>=56){
+    const wv=new DataView(wal.buffer,wal.byteOffset,wal.byteLength),magic=wv.getUint32(0);
+    if(magic===0x377f0682||magic===0x377f0683){
+      const le=magic===0x377f0682,ps=wv.getUint32(8),s1=wv.getUint32(16),s2=wv.getUint32(20);
+      const sum=(off,len,a,b)=>{for(let i=off;i<off+len;i+=8){const x=wv.getUint32(i,le),y=wv.getUint32(i+4,le);a=(a+x+b)>>>0;b=(b+y+a)>>>0}return [a,b]};
+      let [c1,c2]=sum(0,24,0,0);
+      if(c1===wv.getUint32(24)&&c2===wv.getUint32(28)&&ps>0){
+        const pages=new Map();let pend=[],size=0,off=32;
+        while(off+24+ps<=wal.length){
+          if(wv.getUint32(off+8)!==s1||wv.getUint32(off+12)!==s2)break;
+          let [d1,d2]=sum(off,8,c1,c2);[d1,d2]=sum(off+24,ps,d1,d2);
+          if(d1!==wv.getUint32(off+16)||d2!==wv.getUint32(off+20))break;
+          c1=d1;c2=d2;pend.push([wv.getUint32(off),off+24]);
+          const dbs=wv.getUint32(off+4);
+          if(dbs){for(const [pg,o] of pend)pages.set(pg,o);pend=[];size=dbs}
+          off+=24+ps;
+        }
+        if(pages.size){
+          out=new Uint8Array(Math.max(db.length,size*ps));out.set(db);
+          for(const [pg,o] of pages)out.set(wal.subarray(o,o+ps),(pg-1)*ps);
+          if(size*ps<out.length)out=out.slice(0,size*ps);
+        }
+      }
+    }
+  }
+  if(out[18]===2||out[19]===2){if(out===db)out=db.slice();out[18]=1;out[19]=1} // da WAL a modalità normale
+  return out;
+}
+const legacyHeader=db=>{if(db[18]===2||db[19]===2){db[18]=1;db[19]=1}return db};
+const tq=(db,t,sql,p)=>has(db,t)?q(db,sql,p):[];
 const has=(db,t)=>q(db,"select 1 from sqlite_master where type='table' and name=?",[t]).length>0;
 const cnt=(db,t)=>has(db,t)?q(db,`select count(*) n from ${t}`)[0].n:0;
 const cache=new WeakMap();
@@ -237,8 +313,52 @@ function inspect(db){
 const key=r=>LK.map(k=>r[k]).join('|');
 const rk=b=>b.Identifier+'|'+b.StartToken+'|'+b.EndToken+'|'+b.BlockType;
 
+// Tabelle nuove (formati futuri): unione generica guidata dalle chiavi esterne che il database dichiara.
+// Gli id collegati a tabelle che conosco vengono rimappati; le righe già presenti non si duplicano; a parità di chiave vince A.
+function mergeUnknown(A,B,st,maps){
+  const names=q(B,"select name from sqlite_master where type='table' and name not like 'sqlite_%'").map(r=>r.name).filter(n=>!KNOWN.includes(n)&&!IGNORED.includes(n));
+  if(!names.length)return;
+  const fks={},deps={};
+  for(const t of names){
+    if(!has(A,t))throw new Error('Il backup di base non prevede la tabella «'+t+'»: non unisco per non perdere dati.');
+    fks[t]=q(B,'pragma foreign_key_list('+t+')');
+    deps[t]=fks[t].map(f=>f.table).filter(x=>names.includes(x)&&x!==t);
+  }
+  const order=[],seen=new Set();
+  const visit=(t,stack)=>{if(seen.has(t))return;if(stack.includes(t))throw new Error('Le tabelle nuove dipendono una dall\'altra in modo circolare: non unisco.');stack.push(t);deps[t].forEach(d=>visit(d,stack));stack.pop();seen.add(t);order.push(t)};
+  names.forEach(t=>visit(t,[]));
+  for(const t of order){
+    const info=q(A,'pragma table_info('+t+')'),acols=info.map(c=>c.name);
+    const pks=info.filter(c=>c.pk>0).sort((a,b)=>a.pk-b.pk).map(c=>c.name);
+    const auto=pks.length===1&&/^INTEGER$/i.test(info.find(c=>c.name===pks[0]).type);
+    const idCol=auto?pks[0]:null,sigCols=acols.filter(c=>c!==idCol);
+    const sig=o=>JSON.stringify(sigCols.map(c=>o[c]===undefined?null:o[c])),pkSig=o=>JSON.stringify(pks.map(c=>o[c]));
+    const arows=q(A,'select * from '+t),existing=new Map(arows.map(r=>[sig(r),idCol?r[idCol]:true]));
+    const pkSet=!auto&&pks.length?new Set(arows.map(pkSig)):null;
+    maps[t]=maps[t]||{};
+    for(const r of q(B,'select * from '+t)){
+      const o={...r};let bad=false;
+      for(const f of fks[t]){
+        if(o[f.from]==null)continue;
+        const m=maps[f.table];
+        if(!m)throw new Error('La tabella nuova «'+t+'» dipende da «'+f.table+'», che questa pagina non sa rimappare: non unisco per non perdere dati.');
+        const nv=m[o[f.from]];
+        if(nv===undefined){bad=true;break}
+        o[f.from]=nv;
+      }
+      if(bad){st.skipped++;continue}
+      const s=sig(o);
+      if(existing.has(s)){if(idCol)maps[t][r[idCol]]=existing.get(s);st.gen_dup++;continue}
+      if(pkSet){const k=pkSig(o);if(pkSet.has(k)){st.gen_conf++;continue}pkSet.add(k)}
+      const id=ins(A,t,o,idCol?[idCol]:[],!!idCol);
+      if(idCol){maps[t][r[idCol]]=id;existing.set(s,id)}else existing.set(s,true);
+      st.gen_rows++;
+    }
+  }
+}
+
 // Unisce B dentro A (A ha la precedenza nei conflitti senza data)
-function merge(A,B,st,bi,dam){
+function merge(A,B,st,bi,dam,bWins){
   // Posizioni
   const la=new Map(q(A,'select * from Location').map(r=>[key(r),r.LocationId])),L={};
   for(const r of q(B,'select * from Location')){
@@ -270,7 +390,7 @@ function merge(A,B,st,bi,dam){
   for(const r of q(B,'select * from UserMark')){
     const e=ua.get(r.UserMarkGuid),rs=brB.get(r.UserMarkId)||[],loc=L[r.LocationId];
     if(e){
-      U[r.UserMarkId]=e.UserMarkId;st.mark_same++;if(e.ColorIndex!==r.ColorIndex)st.mark_color++;
+      U[r.UserMarkId]=e.UserMarkId;st.mark_same++;if(e.ColorIndex!==r.ColorIndex){st.mark_color++;if(bWins&&loc!==undefined){A.run('update UserMark set ColorIndex=?,StyleIndex=? where UserMarkId=?',[r.ColorIndex,r.StyleIndex,e.UserMarkId]);e.ColorIndex=r.ColorIndex}}
       if(!hasR.has(e.UserMarkId)&&rs.length&&loc!==undefined){ // la copia in A non ha testo evidenziato: la ripristino da B
         A.run('update UserMark set LocationId=?,ColorIndex=?,StyleIndex=? where UserMarkId=?',[loc,r.ColorIndex,r.StyleIndex,e.UserMarkId]);
         for(const b of rs){ins(A,'BlockRange',{...b,UserMarkId:e.UserMarkId},['BlockRangeId']);add(loc,b,e.UserMarkId)}
@@ -328,11 +448,15 @@ function merge(A,B,st,bi,dam){
   for(const r of q(B,'select * from InputField')){
     const l=L[r.LocationId],k=l+'|'+r.TextTag;
     if(l===undefined){st.skipped++;continue}
-    if(ex.has(k)){st.if_dup++;if(ex.get(k)!==r.Value)st.if_conf++;continue}
+    if(ex.has(k)){st.if_dup++;if(ex.get(k)!==r.Value){st.if_conf++;if(bWins){A.run('update InputField set Value=? where LocationId=? and TextTag=?',[r.Value,l,r.TextTag]);ex.set(k,r.Value)}}continue}
     ins(A,'InputField',{...r,LocationId:l});ex.set(k,r.Value);st.if_n++;
   }
-  // File multimediali indipendenti (dedotti dall'hash; nome file rinominato se già usato)
-  const imA=q(A,'select * from IndependentMedia'),byHash=new Map(imA.map(r=>[r.Hash,r])),paths=new Set(imA.map(r=>r.FilePath)),IM={},PATH={};
+  // File multimediali e playlist (se il formato le prevede)
+  const P={},IM={},PATH={};
+  const PL=['PlaylistItem','IndependentMedia','PlaylistItemAccuracy'].every(t=>has(A,t)&&has(B,t));
+  if(!PL&&(cnt(B,'PlaylistItem')||cnt(B,'IndependentMedia')))throw new Error('Un backup contiene playlist o file multimediali che il formato del backup di base non prevede: non unisco per non perdere dati.');
+  if(PL){
+  const imA=q(A,'select * from IndependentMedia'),byHash=new Map(imA.map(r=>[r.Hash,r])),paths=new Set(imA.map(r=>r.FilePath));
   for(const r of q(B,'select * from IndependentMedia')){
     let e=byHash.get(r.Hash);
     if(!e){
@@ -363,7 +487,7 @@ function merge(A,B,st,bi,dam){
   const lkA=new Map([...la].map(([k,i])=>[i,k])),lkB=new Map(q(B,'select * from Location').map(r=>[r.LocationId,key(r)]));
   const hsA=new Map(q(A,'select IndependentMediaId,Hash from IndependentMedia').map(r=>[r.IndependentMediaId,r.Hash]));
   const hsB=new Map(q(B,'select IndependentMediaId,Hash from IndependentMedia').map(r=>[r.IndependentMediaId,r.Hash]));
-  const sa=new Map(),P={};
+  const sa=new Map();
   for(const it of q(A,'select * from PlaylistItem')){const s=sig(A,it,lkA,hsA,descA);if(!sa.has(s))sa.set(s,[]);sa.get(s).push(it.PlaylistItemId)}
   for(const it of q(B,'select * from PlaylistItem')){
     const s=sig(B,it,lkB,hsB,descB),m=sa.get(s);
@@ -379,6 +503,7 @@ function merge(A,B,st,bi,dam){
       for(const x of q(B,'select * from PlaylistItemMarkerParagraphMap where PlaylistItemMarkerId=?',[m2.PlaylistItemMarkerId]))ins(A,'PlaylistItemMarkerParagraphMap',{...x,PlaylistItemMarkerId:mid});
     }
   }
+  }
   // Assegnazioni delle etichette (note, posizioni, elementi di playlist)
   const tm=q(A,'select * from TagMap'),have=new Set(tm.map(x=>[x.TagId,x.NoteId,x.LocationId,x.PlaylistItemId].join('|'))),maxp={};
   for(const x of tm)maxp[x.TagId]=Math.max(maxp[x.TagId]??-1,x.Position);
@@ -391,15 +516,16 @@ function merge(A,B,st,bi,dam){
     ins(A,'TagMap',{PlaylistItemId:pl,LocationId:l,NoteId:n,TagId:t,Position:maxp[t]});
     have.add(k);st.tm++;
   }
+  mergeUnknown(A,B,st,{Location:L,Tag:T,UserMark:U,Note:N,PlaylistItem:P,IndependentMedia:IM});
 }
 
 // Unisce tutti i database; lancia un errore se qualcosa non torna
-function mergeAll(A,Bs,onStep){
-  const st={loc:0,tag:0,mark:0,mark_same:0,mark_color:0,mark_dup:0,mark_overlap:0,note:0,note_upd:0,bm:0,bm_dup:0,bm_moved:0,bm_lost:[],if_n:0,if_dup:0,if_conf:0,tm:0,tm_dup:0,pl:0,pl_dup:0,im:0,mark_fixed:0,mark_empty:0,mark_orphan:0,range_added:0,note_unlinked:0,skipped:0,media:[]};
+function mergeAll(A,Bs,onStep,wins){
+  const st={loc:0,tag:0,mark:0,mark_same:0,mark_color:0,mark_dup:0,mark_overlap:0,note:0,note_upd:0,bm:0,bm_dup:0,bm_moved:0,bm_lost:[],if_n:0,if_dup:0,if_conf:0,tm:0,tm_dup:0,pl:0,pl_dup:0,im:0,mark_fixed:0,mark_empty:0,gen_rows:0,gen_dup:0,gen_conf:0,mark_orphan:0,range_added:0,note_unlinked:0,skipped:0,media:[]};
   const fk0=q(A,'pragma foreign_key_check').length; // eventuali problemi già presenti nel backup di base
   A.run('pragma foreign_keys=on');
   A.run('begin');
-  try{Bs.forEach((B,i)=>{onStep&&onStep(i);const c=inspect(B);merge(A,B,st,i,!!(c.bare||c.bad||c.dang))});A.run('commit')}
+  try{Bs.forEach((B,i)=>{onStep&&onStep(i);const c=inspect(B);merge(A,B,st,i,!!(c.bare||c.bad||c.dang),!!(wins&&wins[i]))});A.run('commit')}
   catch(e){try{A.run('rollback')}catch(_){}throw e}
   const fk=q(A,'pragma foreign_key_check');
   if(fk.length>fk0)throw new Error('Controllo di coerenza fallito (chiavi esterne): '+(fk.length-fk0)+' righe non valide create dall\'unione.');
@@ -419,33 +545,32 @@ $('go').onclick=async()=>{
   $('out').innerHTML='';$('go').disabled=true;
   try{
     log('Controllo compatibilità…');
-    if(new Set(files.map(f=>f.mf.userDataBackup.schemaVersion)).size>1)
-      throw new Error('I backup hanno versioni diverse del database. Aggiorna JW Library su tutti i dispositivi, crea di nuovo i backup e riprova.');
     const base=files[0], A=await openDb(base), Bs=[];
-    for(const f of files.slice(1))Bs.push(await openDb(f));
-    const st=mergeAll(A,Bs,i=>log(`Unisco ${files[i+1].name} (${i+1}/${Bs.length})…`));
+    const others=files.slice(1).sort((a,b)=>b.rank-a.rank); // si unisce prima chi ha la priorità più bassa: l'ultimo ha l'ultima parola
+    for(const f of others)Bs.push(await openDb(f));
+    const st=mergeAll(A,Bs,i=>log(`Unisco ${others[i].name} (${i+1}/${Bs.length})…`),others.map(f=>f.rank<base.rank));
     log('Preparo il file…');
     const need=q(A,'select FilePath from IndependentMedia').map(r=>r.FilePath);
-    const db=A.export();A.close();Bs.forEach(b=>b.close());
+    const db=legacyHeader(A.export());A.close();Bs.forEach(b=>b.close());
     const d=new Date(), day=`${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
-    const hash=[...await sha256(db)].map(b=>b.toString(16)).join(''); // stesso formato dell'app (senza zeri iniziali per byte)
+    const hash=[...await sha256(db)].map(b=>b.toString(16).padStart(2,'0')).join(''); // SHA-256 standard: è il formato che Android verifica
     const mf=JSON.parse(JSON.stringify(base.mf));
     mf.name='UserdataBackup_'+day+'_merged.jwlibrary';
     mf.creationDate=stamp(d);
     mf.userDataBackup.lastModifiedDate=stamp(d);
     mf.userDataBackup.hash=hash;
     mf.userDataBackup.deviceName=base.mf.userDataBackup.deviceName;
-    const dbName=mf.userDataBackup.databaseName||'userData.db';
+    const dbN=mf.userDataBackup.databaseName||'userData.db';
     const out=new JSZip();
     out.file('manifest.json',JSON.stringify(mf));
-    out.file(dbName,db);
+    out.file(dbN,db);
     for(const n of Object.keys(base.zip.files)){
       const zf=base.zip.files[n];
-      if(zf.dir||n==='manifest.json'||n===dbName)continue;
+      if(zf.dir||n==='manifest.json'||n===dbN||n===dbN+'-wal'||n===dbN+'-shm'||n===dbN+'-journal')continue; // i file WAL di Android non servono più
       out.file(n,await zf.async('uint8array'));
     }
     for(const m of st.media){
-      const zf=files[m.b+1].zip.file(m.src);
+      const zf=others[m.b].zip.file(m.src);
       if(!zf)throw new Error('File multimediale mancante nel backup: '+m.src);
       out.file(m.dst,await zf.async('uint8array'));
     }
@@ -456,21 +581,24 @@ $('go').onclick=async()=>{
     const a=document.createElement('a');
     a.href=URL.createObjectURL(blob);a.download=mf.name;a.textContent='Scarica il backup unito';
     $('out').append(a);
-    let t=`Fatto. Aggiunti dagli altri backup: ${st.note} note, ${st.mark} evidenziazioni, ${st.bm} segnalibri, ${st.tag} etichette, ${st.tm} assegnazioni di etichette, ${st.if_n} campi di testo, ${st.pl} elementi di playlist.`;
+    const vs=[...new Set(files.map(f=>f.mf.userDataBackup.schemaVersion))];
+    let t=vs.length>1?`Formati diversi (${vs.join(', ')}): il file unito usa il più recente, il ${files[0].mf.userDataBackup.schemaVersion}.\n`:'';
+    t+=`Fatto. Aggiunti dagli altri backup: ${st.note} note, ${st.mark} evidenziazioni, ${st.bm} segnalibri, ${st.tag} etichette, ${st.tm} assegnazioni di etichette, ${st.if_n} campi di testo, ${st.pl} elementi di playlist.`;
     t+=`\nGià presenti e non duplicati: ${st.mark_same+st.mark_dup} evidenziazioni, ${st.bm_dup} segnalibri, ${st.tm_dup} assegnazioni di etichette, ${st.pl_dup} elementi di playlist.`;
     if(st.note_upd)t+=`\n${st.note_upd} note erano presenti in più backup con testo diverso: ho tenuto la versione modificata più di recente.`;
-    if(st.mark_color)t+=`\n${st.mark_color} evidenziazioni avevano colori diversi tra i backup: ho tenuto quello del backup base.`;
-    if(st.if_conf)t+=`\n${st.if_conf} campi di testo avevano valori diversi: ho tenuto quello del backup base.`;
+    if(st.mark_color)t+=`\n${st.mark_color} evidenziazioni avevano colori diversi tra i backup: ho tenuto quello del backup più recente o più coerente.`;
+    if(st.if_conf)t+=`\n${st.if_conf} campi di testo avevano valori diversi: ho tenuto quello del backup più recente o più coerente.`;
     if(st.mark_fixed)t+=`\n${st.mark_fixed} evidenziazioni senza testo in un backup sono state ripristinate da un altro.`;
     if(st.mark_empty)t+=`\n${st.mark_empty} evidenziazioni senza testo (non visibili) in un backup danneggiato sono state ignorate.`;
     if(st.range_added)t+=`\n${st.range_added} paragrafi evidenziati presenti solo in un backup sono stati aggiunti alle evidenziazioni già esistenti.`;
     if(st.mark_orphan)t+=`\n${st.mark_orphan} evidenziazioni puntavano a posizioni inesistenti in un backup danneggiato e non si possono recuperare.`;
     if(st.note_unlinked)t+=`\n${st.note_unlinked} note avevano un collegamento errato a un'evidenziazione: le ho tenute senza collegamento.`;
+    if(st.gen_rows||st.gen_dup||st.gen_conf)t+=`\n${st.gen_rows} righe di tabelle nuove unite in modo generico (${st.gen_dup} già presenti${st.gen_conf?', '+st.gen_conf+' in conflitto: ho tenuto quelle del backup base':''}). Il formato non è verificato: controlla bene il risultato.`;
     if(st.skipped)t+=`\n${st.skipped} elementi con riferimenti non validi in un backup sono stati ignorati.`;
     if(st.bm_lost.length)t+=`\nNon inseriti perché la pubblicazione ha già 10 segnalibri: ${[...new Set(st.bm_lost)].join('; ')}.`;
     log(t+'\nOra apri il file su iPhone o iPad e ripristinalo in JW Library.');
   }catch(e){console.error(e);log('Errore: '+e.message,1)}
-  $('go').disabled=files.length<2;
+  upd();
 };
 
 // ---------- istruzioni "Aggiungi a Home" (si aprono dal pulsante della dashboard) ----------
